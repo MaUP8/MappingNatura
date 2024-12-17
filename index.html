@@ -3,138 +3,171 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Deformar Video Mapping</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <title>Video Mapping con Máscara Deformable</title>
   <style>
-    body {
+    * {
       margin: 0;
-      background: #111;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #000;
       color: white;
       font-family: Arial, sans-serif;
       text-align: center;
-    }
-    h1 {
-      margin: 10px 0;
-    }
-    #controls {
-      margin: 10px;
-    }
-    #youtubeInput {
-      margin: 5px;
-      padding: 8px;
-      width: 70%;
-      font-size: 1em;
-    }
-    #loadButton {
-      padding: 8px;
-      font-size: 1em;
-      cursor: pointer;
-    }
-    .container {
-      position: relative;
-      margin-top: 10px;
-    }
-    #videoContainer {
-      position: absolute;
-      width: 500px;
-      height: 500px;
       overflow: hidden;
     }
-    #player {
-      width: 100%;
-      height: 100%;
-    }
-    #deformableSVG {
+    canvas {
+      display: block;
       position: absolute;
       top: 0;
       left: 0;
-      width: 500px;
-      height: 500px;
     }
-    polygon {
-      fill: transparent;
-      stroke: white;
-      stroke-width: 2;
-      cursor: pointer;
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 10px;
+      border-radius: 5px;
+    }
+    input, button {
+      margin: 5px;
+      padding: 8px;
+      font-size: 1em;
     }
   </style>
 </head>
 <body>
-  <h1>Deformar Video Mapping</h1>
   <div id="controls">
-    <input type="text" id="youtubeInput" placeholder="Pega la URL del video de YouTube aquí">
-    <button id="loadButton">Cargar Video</button>
+    <input type="file" id="videoInput" accept="video/*">
+    <button id="resetButton">Resetear Máscara</button>
   </div>
-  
-  <div class="container">
-    <!-- Contenedor del video -->
-    <div id="videoContainer">
-      <div id="player"></div>
-    </div>
-    <!-- Figura deformable -->
-    <svg id="deformableSVG" viewBox="0 0 500 500">
-      <polygon id="deformablePolygon" points="50,50 450,50 450,450 50,450"></polygon>
-    </svg>
-  </div>
+  <canvas id="videoCanvas"></canvas>
+  <canvas id="maskCanvas"></canvas>
 
   <script>
-    // API de YouTube
-    let player;
-    const loadButton = document.getElementById('loadButton');
-    const youtubeInput = document.getElementById('youtubeInput');
-    
-    // Inicializar el reproductor de YouTube
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        height: '500',
-        width: '500',
-        videoId: 'dQw4w9WgXcQ', // Video por defecto
-        events: {
-          onReady: (event) => event.target.playVideo()
-        }
+    const videoCanvas = document.getElementById('videoCanvas');
+    const maskCanvas = document.getElementById('maskCanvas');
+    const videoCtx = videoCanvas.getContext('2d');
+    const maskCtx = maskCanvas.getContext('2d');
+
+    const videoInput = document.getElementById('videoInput');
+    const resetButton = document.getElementById('resetButton');
+
+    let video = null;
+    let maskPoints = [
+      { x: 100, y: 100 },
+      { x: 500, y: 100 },
+      { x: 500, y: 500 },
+      { x: 100, y: 500 },
+    ];
+    let selectedPoint = null;
+
+    // Ajustar tamaños de los canvas
+    function resizeCanvas() {
+      videoCanvas.width = window.innerWidth;
+      videoCanvas.height = window.innerHeight;
+      maskCanvas.width = window.innerWidth;
+      maskCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Dibujar máscara deformable
+    function drawMask() {
+      maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+      maskCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      maskCtx.strokeStyle = 'white';
+      maskCtx.lineWidth = 2;
+
+      maskCtx.beginPath();
+      maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
+      for (let i = 1; i < maskPoints.length; i++) {
+        maskCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
+      }
+      maskCtx.closePath();
+      maskCtx.fill();
+      maskCtx.stroke();
+
+      // Dibujar nodos
+      maskCtx.fillStyle = 'red';
+      maskPoints.forEach(point => {
+        maskCtx.beginPath();
+        maskCtx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+        maskCtx.fill();
       });
     }
 
-    // Cargar nuevo video desde el input
-    loadButton.addEventListener('click', () => {
-      const url = youtubeInput.value;
-      const videoId = extractVideoID(url);
-      if (videoId) {
-        player.loadVideoById(videoId);
-      } else {
-        alert("Por favor, ingresa una URL válida de YouTube.");
+    // Interactividad con la máscara
+    maskCanvas.addEventListener('mousedown', (e) => {
+      const { offsetX, offsetY } = e;
+      selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
+    });
+    maskCanvas.addEventListener('mousemove', (e) => {
+      if (selectedPoint) {
+        selectedPoint.x = e.offsetX;
+        selectedPoint.y = e.offsetY;
+        drawMask();
+      }
+    });
+    maskCanvas.addEventListener('mouseup', () => selectedPoint = null);
+
+    // Dibujar video ajustado a la máscara
+    function drawVideo() {
+      if (video && !video.paused && !video.ended) {
+        videoCtx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+
+        // Crear una máscara de recorte
+        videoCtx.save();
+        videoCtx.beginPath();
+        videoCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
+        for (let i = 1; i < maskPoints.length; i++) {
+          videoCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
+        }
+        videoCtx.closePath();
+        videoCtx.clip();
+
+        // Dibujar el video
+        videoCtx.drawImage(video, 0, 0, videoCanvas.width, videoCanvas.height);
+
+        videoCtx.restore();
+      }
+      requestAnimationFrame(drawVideo);
+    }
+
+    // Cargar video desde el input
+    videoInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (video) video.pause();
+        video = document.createElement('video');
+        video.src = URL.createObjectURL(file);
+        video.autoplay = true;
+        video.loop = true;
+
+        video.addEventListener('loadeddata', () => {
+          drawMask();
+          drawVideo();
+        });
       }
     });
 
-    function extractVideoID(url) {
-      const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=))([^&\n?#]+)/);
-      return match ? match[1] : null;
-    }
-
-    // Manipulación de nodos SVG
-    const polygon = document.getElementById('deformablePolygon');
-    let points = polygon.getAttribute('points').split(' ').map(p => p.split(',').map(Number));
-
-    document.getElementById('deformableSVG').addEventListener('click', () => {
-      // Deformar los puntos aleatoriamente
-      points = points.map(([x, y]) => [
-        x + Math.random() * 50 - 25,
-        y + Math.random() * 50 - 25
-      ]);
-      polygon.setAttribute('points', points.map(p => p.join(',')).join(' '));
-
-      anime({
-        targets: polygon,
-        easing: 'easeInOutQuad',
-        duration: 800
-      });
+    // Resetear la máscara
+    resetButton.addEventListener('click', () => {
+      maskPoints = [
+        { x: 100, y: 100 },
+        { x: 500, y: 100 },
+        { x: 500, y: 500 },
+        { x: 100, y: 500 },
+      ];
+      drawMask();
     });
 
-    // Cargar la API de YouTube
-    const tag = document.createElement('script');
-    tag.src = "https://www.youtube.com/iframe_api";
-    const firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    // Inicialización
+    drawMask();
   </script>
 </body>
 </html>
+
