@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Video Mapping Avanzado</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <style>
     body {
       margin: 0;
@@ -13,14 +12,12 @@
       font-family: Arial, sans-serif;
       overflow: hidden;
     }
-
     canvas {
       position: absolute;
       top: 0;
       left: 0;
       display: block;
     }
-
     #menuIcon {
       position: absolute;
       top: 10px;
@@ -30,7 +27,6 @@
       cursor: pointer;
       z-index: 2;
     }
-
     #menu {
       position: absolute;
       top: 0;
@@ -43,37 +39,29 @@
       transition: transform 0.3s ease-in-out;
       z-index: 3;
     }
-
     #menu.visible {
       transform: translateX(0);
     }
-
-    #menu h2 {
-      color: white;
-    }
-
     input, button {
       margin: 10px 0;
       width: 100%;
       padding: 5px;
     }
-
     button {
       cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <!-- Icono para mostrar el menú -->
+  <!-- Botón de menú -->
   <div id="menuIcon">⚙️</div>
 
   <!-- Menú oculto -->
   <div id="menu">
     <h2>Opciones</h2>
     <input type="file" id="videoInput" accept="video/*">
-    <input type="text" id="youtubeInput" placeholder="Pega URL de YouTube">
-    <button id="loadVideoButton">Cargar Video</button>
     <button id="addNodeButton">Agregar Nodo</button>
+    <button id="deleteNodeButton">Eliminar Nodo Seleccionado</button>
     <button id="resetButton">Resetear Máscara</button>
   </div>
 
@@ -88,8 +76,6 @@
     const maskCtx = maskCanvas.getContext('2d');
 
     const videoInput = document.getElementById('videoInput');
-    const youtubeInput = document.getElementById('youtubeInput');
-    const loadVideoButton = document.getElementById('loadVideoButton');
     const addNodeButton = document.getElementById('addNodeButton');
     const resetButton = document.getElementById('resetButton');
     const menuIcon = document.getElementById('menuIcon');
@@ -97,13 +83,15 @@
 
     let video = null;
     let maskPoints = [
-      { x: 100, y: 100 },
-      { x: 500, y: 100 },
-      { x: 500, y: 500 },
-      { x: 100, y: 500 }
+      { x: 100, y: 100, cx1: null, cy1: null, cx2: null, cy2: null },
+      { x: 500, y: 100, cx1: null, cy1: null, cx2: null, cy2: null },
+      { x: 500, y: 500, cx1: null, cy1: null, cx2: null, cy2: null },
+      { x: 100, y: 500, cx1: null, cy1: null, cx2: null, cy2: null }
     ];
     let selectedPoint = null;
+    let selectedHandle = null;
 
+    // Ajustar canvas
     function resizeCanvas() {
       videoCanvas.width = window.innerWidth;
       videoCanvas.height = window.innerHeight;
@@ -113,34 +101,73 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
+    // Dibujar máscara con curvas Bézier
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-      maskCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
       maskCtx.strokeStyle = 'white';
       maskCtx.lineWidth = 2;
 
       maskCtx.beginPath();
       maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
-      for (let i = 1; i < maskPoints.length; i++) {
-        maskCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
+
+      for (let i = 0; i < maskPoints.length; i++) {
+        const p1 = maskPoints[i];
+        const p2 = maskPoints[(i + 1) % maskPoints.length];
+
+        // Curvas Bézier si existen controladores
+        if (p1.cx2 !== null && p2.cx1 !== null) {
+          maskCtx.bezierCurveTo(p1.cx2, p1.cy2, p2.cx1, p2.cy1, p2.x, p2.y);
+        } else {
+          maskCtx.lineTo(p2.x, p2.y);
+        }
       }
+
       maskCtx.closePath();
-      maskCtx.fill();
       maskCtx.stroke();
 
-      // Dibujar puntos
-      maskCtx.fillStyle = 'red';
+      // Dibujar puntos y manipuladores
       maskPoints.forEach(p => {
+        maskCtx.fillStyle = 'red';
         maskCtx.beginPath();
         maskCtx.arc(p.x, p.y, 8, 0, Math.PI * 2);
         maskCtx.fill();
+
+        if (p.cx1 !== null && p.cy1 !== null) {
+          maskCtx.fillStyle = 'blue';
+          maskCtx.beginPath();
+          maskCtx.arc(p.cx1, p.cy1, 5, 0, Math.PI * 2);
+          maskCtx.fill();
+        }
+
+        if (p.cx2 !== null && p.cy2 !== null) {
+          maskCtx.fillStyle = 'green';
+          maskCtx.beginPath();
+          maskCtx.arc(p.cx2, p.cy2, 5, 0, Math.PI * 2);
+          maskCtx.fill();
+        }
       });
     }
 
+    // Agregar nodo
+    addNodeButton.addEventListener('click', () => {
+      maskPoints.push({ x: 300, y: 300, cx1: null, cy1: null, cx2: null, cy2: null });
+      drawMask();
+    });
+
+    // Eliminar nodo
+    maskCanvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const { offsetX, offsetY } = e;
+      maskPoints = maskPoints.filter(p => Math.hypot(p.x - offsetX, p.y - offsetY) > 10);
+      drawMask();
+    });
+
+    // Seleccionar y mover nodos
     maskCanvas.addEventListener('mousedown', (e) => {
       const { offsetX, offsetY } = e;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
     });
+
     maskCanvas.addEventListener('mousemove', (e) => {
       if (selectedPoint) {
         selectedPoint.x = e.offsetX;
@@ -148,64 +175,21 @@
         drawMask();
       }
     });
+
     maskCanvas.addEventListener('mouseup', () => selectedPoint = null);
 
-    function drawVideo() {
-      if (video && !video.paused && !video.ended) {
-        videoCtx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
-        videoCtx.save();
-        videoCtx.beginPath();
-        videoCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
-        for (let i = 1; i < maskPoints.length; i++) {
-          videoCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
-        }
-        videoCtx.closePath();
-        videoCtx.clip();
-        videoCtx.drawImage(video, 0, 0, videoCanvas.width, videoCanvas.height);
-        videoCtx.restore();
-      }
-      requestAnimationFrame(drawVideo);
-    }
-
-    videoInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        video = document.createElement('video');
-        video.src = URL.createObjectURL(file);
-        video.loop = true;
-        video.autoplay = true;
-        video.play();
-        drawVideo();
-      }
-    });
-
-    loadVideoButton.addEventListener('click', () => {
-      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
-      if (videoId) {
-        video = document.createElement('iframe');
-        video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1`;
-        video.width = videoCanvas.width;
-        video.height = videoCanvas.height;
-        document.body.appendChild(video);
-      }
-    });
-
-    addNodeButton.addEventListener('click', () => {
-      maskPoints.push({ x: 300, y: 300 });
-      drawMask();
-    });
+    menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
 
     resetButton.addEventListener('click', () => {
       maskPoints = [
-        { x: 100, y: 100 },
-        { x: 500, y: 100 },
-        { x: 500, y: 500 },
-        { x: 100, y: 500 }
+        { x: 100, y: 100, cx1: null, cy1: null, cx2: null, cy2: null },
+        { x: 500, y: 100, cx1: null, cy1: null, cx2: null, cy2: null },
+        { x: 500, y: 500, cx1: null, cy1: null, cx2: null, cy2: null },
+        { x: 100, y: 500, cx1: null, cy1: null, cx2: null, cy2: null }
       ];
       drawMask();
     });
 
-    menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
     drawMask();
   </script>
 </body>
