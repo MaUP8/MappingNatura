@@ -3,124 +3,138 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mapping con Efectos</title>
-  <!-- Anime.js para manipulación -->
+  <title>Deformar Video Mapping</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <style>
     body {
       margin: 0;
-      background: black;
+      background: #111;
       color: white;
       font-family: Arial, sans-serif;
       text-align: center;
     }
-
-    .container {
-      margin: 20px;
+    h1 {
+      margin: 10px 0;
     }
-
-    #videoCanvas {
-      border: 1px solid white;
-      margin: 20px auto;
-      display: block;
-    }
-
-    #shape {
-      width: 100%;
-      height: auto;
-      margin-top: 20px;
-    }
-
     #controls {
-      margin-bottom: 10px;
+      margin: 10px;
+    }
+    #youtubeInput {
+      margin: 5px;
+      padding: 8px;
+      width: 70%;
+      font-size: 1em;
+    }
+    #loadButton {
+      padding: 8px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    .container {
+      position: relative;
+      margin-top: 10px;
+    }
+    #videoContainer {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      overflow: hidden;
+    }
+    #player {
+      width: 100%;
+      height: 100%;
+    }
+    #deformableSVG {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 500px;
+      height: 500px;
+    }
+    polygon {
+      fill: transparent;
+      stroke: white;
+      stroke-width: 2;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <!-- Contenedor principal -->
+  <h1>Deformar Video Mapping</h1>
+  <div id="controls">
+    <input type="text" id="youtubeInput" placeholder="Pega la URL del video de YouTube aquí">
+    <button id="loadButton">Cargar Video</button>
+  </div>
+  
   <div class="container">
-    <h1>Mapping con Efectos</h1>
-    <div id="controls">
-      <label for="effectSelect">Seleccionar efecto:</label>
-      <select id="effectSelect">
-        <option value="none">Ninguno</option>
-        <option value="grayscale">Blanco y Negro</option>
-        <option value="invert">Invertir Colores</option>
-        <option value="blur">Desenfoque</option>
-      </select>
+    <!-- Contenedor del video -->
+    <div id="videoContainer">
+      <div id="player"></div>
     </div>
-
-    <!-- Canvas para el video -->
-    <canvas id="videoCanvas"></canvas>
-
-    <!-- Figura deformable SVG -->
-    <svg id="shape" viewBox="0 0 500 500">
-      <polygon id="deformable" points="50,50 450,50 450,450 50,450" fill="rgba(0,0,0,0.5)" stroke="white" stroke-width="2"/>
+    <!-- Figura deformable -->
+    <svg id="deformableSVG" viewBox="0 0 500 500">
+      <polygon id="deformablePolygon" points="50,50 450,50 450,450 50,450"></polygon>
     </svg>
   </div>
 
   <script>
-    const canvas = document.getElementById('videoCanvas');
-    const ctx = canvas.getContext('2d');
-    const shape = document.getElementById('deformable');
-    const selectEffect = document.getElementById('effectSelect');
-
-    // Ajustar tamaño de canvas
-    canvas.width = window.innerWidth * 0.8;
-    canvas.height = window.innerHeight * 0.5;
-
-    // Simular video
-    let video = document.createElement('video');
-    video.src = "https://www.w3schools.com/html/mov_bbb.mp4"; // Video de prueba
-    video.autoplay = true;
-    video.loop = true;
-
-    // Dibujar video en canvas
-    function drawVideo() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Aplicar efecto seleccionado
-      applyEffect();
-
-      requestAnimationFrame(drawVideo);
+    // API de YouTube
+    let player;
+    const loadButton = document.getElementById('loadButton');
+    const youtubeInput = document.getElementById('youtubeInput');
+    
+    // Inicializar el reproductor de YouTube
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '500',
+        width: '500',
+        videoId: 'dQw4w9WgXcQ', // Video por defecto
+        events: {
+          onReady: (event) => event.target.playVideo()
+        }
+      });
     }
 
-    // Efectos de video
-    function applyEffect() {
-      let effect = selectEffect.value;
-      if (effect === "grayscale") {
-        ctx.filter = "grayscale(100%)";
-      } else if (effect === "invert") {
-        ctx.filter = "invert(100%)";
-      } else if (effect === "blur") {
-        ctx.filter = "blur(5px)";
+    // Cargar nuevo video desde el input
+    loadButton.addEventListener('click', () => {
+      const url = youtubeInput.value;
+      const videoId = extractVideoID(url);
+      if (videoId) {
+        player.loadVideoById(videoId);
       } else {
-        ctx.filter = "none";
+        alert("Por favor, ingresa una URL válida de YouTube.");
       }
+    });
+
+    function extractVideoID(url) {
+      const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=))([^&\n?#]+)/);
+      return match ? match[1] : null;
     }
 
-    // Manipulación del SVG
-    let points = shape.getAttribute('points').split(' ').map(p => p.split(','));
+    // Manipulación de nodos SVG
+    const polygon = document.getElementById('deformablePolygon');
+    let points = polygon.getAttribute('points').split(' ').map(p => p.split(',').map(Number));
 
-    shape.addEventListener('click', () => {
-      points = points.map(p => [
-        parseInt(p[0]) + (Math.random() * 50 - 25),
-        parseInt(p[1]) + (Math.random() * 50 - 25)
+    document.getElementById('deformableSVG').addEventListener('click', () => {
+      // Deformar los puntos aleatoriamente
+      points = points.map(([x, y]) => [
+        x + Math.random() * 50 - 25,
+        y + Math.random() * 50 - 25
       ]);
-      shape.setAttribute('points', points.map(p => p.join(',')).join(' '));
+      polygon.setAttribute('points', points.map(p => p.join(',')).join(' '));
 
       anime({
-        targets: shape,
-        duration: 1000,
+        targets: polygon,
         easing: 'easeInOutQuad',
-        strokeDashoffset: [anime.setDashoffset, 0],
+        duration: 800
       });
     });
 
-    // Iniciar el video
-    video.play();
-    drawVideo();
+    // Cargar la API de YouTube
+    const tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
   </script>
 </body>
 </html>
