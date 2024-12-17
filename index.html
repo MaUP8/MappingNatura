@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Mapping Optimizado</title>
+  <title>Video Mapping con Nodos</title>
   <style>
     body {
       margin: 0;
       background: black;
       overflow: hidden;
       font-family: Arial, sans-serif;
+      touch-action: none; /* Evita comportamientos táctiles por defecto */
     }
     canvas {
       position: absolute;
@@ -17,7 +18,6 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      touch-action: none; /* Evita el comportamiento predeterminado táctil */
     }
     #menuIcon {
       position: absolute;
@@ -64,7 +64,7 @@
   </style>
 </head>
 <body>
-  <!-- Icono del menú -->
+  <!-- Botón de menú -->
   <div id="menuIcon">☰</div>
 
   <!-- Menú -->
@@ -100,12 +100,11 @@
       { x: window.innerWidth - 100, y: window.innerHeight - 100 },
       { x: 100, y: window.innerHeight - 100 }
     ];
-    let video = null;
     let selectedPoint = null;
     let isDragging = false;
+    let video = null;
     let isPlaying = false;
 
-    // Redimensionar Canvas
     function resizeCanvas() {
       maskCanvas.width = window.innerWidth;
       maskCanvas.height = window.innerHeight;
@@ -113,7 +112,6 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Dibujar máscara y video
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
 
@@ -151,24 +149,32 @@
       requestAnimationFrame(drawMask);
     }
 
-    // Eventos táctiles
-    maskCanvas.addEventListener('touchstart', (e) => {
-      const touch = e.touches[0];
-      const offsetX = touch.clientX, offsetY = touch.clientY;
+    maskCanvas.addEventListener('mousedown', (e) => {
+      const { offsetX, offsetY } = e;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
       isDragging = !!selectedPoint;
     });
 
-    maskCanvas.addEventListener('touchmove', (e) => {
+    maskCanvas.addEventListener('mousemove', (e) => {
       if (isDragging && selectedPoint) {
-        const touch = e.touches[0];
-        selectedPoint.x = touch.clientX;
-        selectedPoint.y = touch.clientY;
+        selectedPoint.x = e.offsetX;
+        selectedPoint.y = e.offsetY;
       }
     });
 
-    maskCanvas.addEventListener('touchend', () => {
+    maskCanvas.addEventListener('mouseup', () => {
       isDragging = false;
+    });
+
+    addNodeButton.addEventListener('click', () => {
+      maskPoints.push({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+    });
+
+    deleteNodeButton.addEventListener('click', () => {
+      if (selectedPoint) {
+        maskPoints = maskPoints.filter(p => p !== selectedPoint);
+        selectedPoint = null;
+      }
     });
 
     videoInput.addEventListener('change', (e) => {
@@ -183,9 +189,19 @@
       }
     });
 
+    loadYouTubeButton.addEventListener('click', () => {
+      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
+      if (videoId) {
+        video = document.createElement('video');
+        video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1`;
+        video.crossOrigin = "anonymous";
+        video.loop = true;
+        video.play();
+      }
+    });
+
+    menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
     drawMask();
   </script>
 </body>
 </html>
-
-
