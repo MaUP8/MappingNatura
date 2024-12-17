@@ -12,56 +12,59 @@
       font-family: Arial, sans-serif;
       overflow: hidden;
     }
+
     canvas {
       position: absolute;
       top: 0;
       left: 0;
       display: block;
     }
+
     #menuIcon {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      font-size: 2em;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.5em;
       color: white;
       cursor: pointer;
-      z-index: 2;
+      z-index: 3;
+      user-select: none;
     }
+
     #menu {
       position: absolute;
-      top: 0;
+      bottom: 0;
       left: 0;
-      width: 250px;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 20px;
-      transform: translateX(-100%);
-      transition: transform 0.3s ease-in-out;
-      z-index: 3;
-    }
-    #menu.visible {
-      transform: translateX(0);
-    }
-    input, button {
-      margin: 10px 0;
       width: 100%;
-      padding: 5px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 10px;
+      transform: translateY(100%);
+      transition: transform 0.3s ease-in-out;
+      z-index: 2;
+      text-align: center;
     }
+
+    #menu.visible {
+      transform: translateY(0);
+    }
+
     button {
+      margin: 5px;
+      padding: 8px 10px;
+      font-size: 1em;
       cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <!-- Botón de menú -->
-  <div id="menuIcon">⚙️</div>
+  <!-- Icono para mostrar/ocultar el menú -->
+  <div id="menuIcon">▲</div>
 
-  <!-- Menú oculto -->
+  <!-- Menú en la parte inferior -->
   <div id="menu">
-    <h2>Opciones</h2>
-    <input type="file" id="videoInput" accept="video/*">
     <button id="addNodeButton">Agregar Nodo</button>
-    <button id="deleteNodeButton">Eliminar Nodo Seleccionado</button>
+    <button id="deleteNodeButton">Eliminar Nodo</button>
     <button id="resetButton">Resetear Máscara</button>
   </div>
 
@@ -75,21 +78,18 @@
     const videoCtx = videoCanvas.getContext('2d');
     const maskCtx = maskCanvas.getContext('2d');
 
-    const videoInput = document.getElementById('videoInput');
+    const menu = document.getElementById('menu');
+    const menuIcon = document.getElementById('menuIcon');
     const addNodeButton = document.getElementById('addNodeButton');
     const resetButton = document.getElementById('resetButton');
-    const menuIcon = document.getElementById('menuIcon');
-    const menu = document.getElementById('menu');
 
-    let video = null;
     let maskPoints = [
-      { x: 100, y: 100, cx1: null, cy1: null, cx2: null, cy2: null },
-      { x: 500, y: 100, cx1: null, cy1: null, cx2: null, cy2: null },
-      { x: 500, y: 500, cx1: null, cy1: null, cx2: null, cy2: null },
-      { x: 100, y: 500, cx1: null, cy1: null, cx2: null, cy2: null }
+      { x: 100, y: 100 },
+      { x: 500, y: 100 },
+      { x: 500, y: 500 },
+      { x: 100, y: 500 }
     ];
     let selectedPoint = null;
-    let selectedHandle = null;
 
     // Ajustar canvas
     function resizeCanvas() {
@@ -101,7 +101,7 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Dibujar máscara con curvas Bézier
+    // Dibujar máscara y puntos
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
       maskCtx.strokeStyle = 'white';
@@ -109,63 +109,43 @@
 
       maskCtx.beginPath();
       maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
-
-      for (let i = 0; i < maskPoints.length; i++) {
-        const p1 = maskPoints[i];
-        const p2 = maskPoints[(i + 1) % maskPoints.length];
-
-        // Curvas Bézier si existen controladores
-        if (p1.cx2 !== null && p2.cx1 !== null) {
-          maskCtx.bezierCurveTo(p1.cx2, p1.cy2, p2.cx1, p2.cy1, p2.x, p2.y);
-        } else {
-          maskCtx.lineTo(p2.x, p2.y);
-        }
+      for (let i = 1; i < maskPoints.length; i++) {
+        maskCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
       }
-
       maskCtx.closePath();
       maskCtx.stroke();
 
-      // Dibujar puntos y manipuladores
+      // Dibujar nodos
       maskPoints.forEach(p => {
-        maskCtx.fillStyle = 'red';
+        maskCtx.fillStyle = p === selectedPoint ? 'red' : 'white';
+        const size = p === selectedPoint ? 8 : 4;
+
         maskCtx.beginPath();
-        maskCtx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+        maskCtx.arc(p.x, p.y, size, 0, Math.PI * 2);
         maskCtx.fill();
-
-        if (p.cx1 !== null && p.cy1 !== null) {
-          maskCtx.fillStyle = 'blue';
-          maskCtx.beginPath();
-          maskCtx.arc(p.cx1, p.cy1, 5, 0, Math.PI * 2);
-          maskCtx.fill();
-        }
-
-        if (p.cx2 !== null && p.cy2 !== null) {
-          maskCtx.fillStyle = 'green';
-          maskCtx.beginPath();
-          maskCtx.arc(p.cx2, p.cy2, 5, 0, Math.PI * 2);
-          maskCtx.fill();
-        }
       });
     }
 
     // Agregar nodo
     addNodeButton.addEventListener('click', () => {
-      maskPoints.push({ x: 300, y: 300, cx1: null, cy1: null, cx2: null, cy2: null });
+      maskPoints.push({ x: 300, y: 300 });
       drawMask();
     });
 
-    // Eliminar nodo
-    maskCanvas.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      const { offsetX, offsetY } = e;
-      maskPoints = maskPoints.filter(p => Math.hypot(p.x - offsetX, p.y - offsetY) > 10);
-      drawMask();
+    // Eliminar nodo seleccionado
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Delete' && selectedPoint) {
+        maskPoints = maskPoints.filter(p => p !== selectedPoint);
+        selectedPoint = null;
+        drawMask();
+      }
     });
 
-    // Seleccionar y mover nodos
+    // Selección de nodos
     maskCanvas.addEventListener('mousedown', (e) => {
       const { offsetX, offsetY } = e;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
+      drawMask();
     });
 
     maskCanvas.addEventListener('mousemove', (e) => {
@@ -176,23 +156,33 @@
       }
     });
 
-    maskCanvas.addEventListener('mouseup', () => selectedPoint = null);
+    maskCanvas.addEventListener('mouseup', () => {
+      selectedPoint = null;
+      drawMask();
+    });
 
-    menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
-
+    // Resetear máscara
     resetButton.addEventListener('click', () => {
       maskPoints = [
-        { x: 100, y: 100, cx1: null, cy1: null, cx2: null, cy2: null },
-        { x: 500, y: 100, cx1: null, cy1: null, cx2: null, cy2: null },
-        { x: 500, y: 500, cx1: null, cy1: null, cx2: null, cy2: null },
-        { x: 100, y: 500, cx1: null, cy1: null, cx2: null, cy2: null }
+        { x: 100, y: 100 },
+        { x: 500, y: 100 },
+        { x: 500, y: 500 },
+        { x: 100, y: 500 }
       ];
+      selectedPoint = null;
       drawMask();
+    });
+
+    // Mostrar/Ocultar menú
+    menuIcon.addEventListener('click', () => {
+      menu.classList.toggle('visible');
+      menuIcon.textContent = menu.classList.contains('visible') ? '▼' : '▲';
     });
 
     drawMask();
   </script>
 </body>
 </html>
+
 
 
