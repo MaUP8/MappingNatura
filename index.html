@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Mapping Avanzado</title>
+  <title>Video Mapping Optimizado</title>
   <style>
     body {
       margin: 0;
@@ -17,6 +17,7 @@
       left: 0;
       width: 100vw;
       height: 100vh;
+      touch-action: none; /* Evita el comportamiento predeterminado táctil */
     }
     #menuIcon {
       position: absolute;
@@ -88,10 +89,10 @@
     const videoInput = document.getElementById('videoInput');
     const youtubeInput = document.getElementById('youtubeInput');
     const loadYouTubeButton = document.getElementById('loadYouTubeButton');
-    const playPauseButton = document.getElementById('playPauseButton');
     const addNodeButton = document.getElementById('addNodeButton');
     const deleteNodeButton = document.getElementById('deleteNodeButton');
     const resetButton = document.getElementById('resetButton');
+    const playPauseButton = document.getElementById('playPauseButton');
 
     let maskPoints = [
       { x: 100, y: 100 },
@@ -99,11 +100,12 @@
       { x: window.innerWidth - 100, y: window.innerHeight - 100 },
       { x: 100, y: window.innerHeight - 100 }
     ];
+    let video = null;
     let selectedPoint = null;
     let isDragging = false;
-    let video = null;
     let isPlaying = false;
 
+    // Redimensionar Canvas
     function resizeCanvas() {
       maskCanvas.width = window.innerWidth;
       maskCanvas.height = window.innerHeight;
@@ -111,8 +113,10 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
+    // Dibujar máscara y video
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+
       if (video) {
         maskCtx.save();
         maskCtx.beginPath();
@@ -125,6 +129,7 @@
         maskCtx.drawImage(video, 0, 0, maskCanvas.width, maskCanvas.height);
         maskCtx.restore();
       }
+
       maskCtx.strokeStyle = 'white';
       maskCtx.lineWidth = 2;
       maskCtx.beginPath();
@@ -146,32 +151,24 @@
       requestAnimationFrame(drawMask);
     }
 
-    maskCanvas.addEventListener('mousedown', (e) => {
-      const { offsetX, offsetY } = e;
+    // Eventos táctiles
+    maskCanvas.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      const offsetX = touch.clientX, offsetY = touch.clientY;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
-      isDragging = true;
+      isDragging = !!selectedPoint;
     });
 
-    maskCanvas.addEventListener('mousemove', (e) => {
+    maskCanvas.addEventListener('touchmove', (e) => {
       if (isDragging && selectedPoint) {
-        selectedPoint.x = e.offsetX;
-        selectedPoint.y = e.offsetY;
+        const touch = e.touches[0];
+        selectedPoint.x = touch.clientX;
+        selectedPoint.y = touch.clientY;
       }
     });
 
-    maskCanvas.addEventListener('mouseup', () => {
+    maskCanvas.addEventListener('touchend', () => {
       isDragging = false;
-    });
-
-    addNodeButton.addEventListener('click', () => {
-      maskPoints.push({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-    });
-
-    deleteNodeButton.addEventListener('click', () => {
-      if (selectedPoint) {
-        maskPoints = maskPoints.filter(p => p !== selectedPoint);
-        selectedPoint = null;
-      }
     });
 
     videoInput.addEventListener('change', (e) => {
@@ -180,49 +177,15 @@
         video = document.createElement('video');
         video.src = URL.createObjectURL(file);
         video.loop = true;
+        video.muted = true;
         video.play();
         isPlaying = true;
-        playPauseButton.textContent = 'Pause';
       }
     });
 
-    loadYouTubeButton.addEventListener('click', () => {
-      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
-      if (videoId) {
-        video = document.createElement('video');
-        video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1`;
-        video.crossOrigin = "anonymous";
-        video.loop = true;
-        video.play();
-      }
-    });
-
-    playPauseButton.addEventListener('click', () => {
-      if (video) {
-        if (isPlaying) {
-          video.pause();
-          playPauseButton.textContent = 'Play';
-        } else {
-          video.play();
-          playPauseButton.textContent = 'Pause';
-        }
-        isPlaying = !isPlaying;
-      }
-    });
-
-    resetButton.addEventListener('click', () => {
-      maskPoints = [
-        { x: 100, y: 100 },
-        { x: window.innerWidth - 100, y: 100 },
-        { x: window.innerWidth - 100, y: window.innerHeight - 100 },
-        { x: 100, y: window.innerHeight - 100 }
-      ];
-      selectedPoint = null;
-    });
-
-    menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
     drawMask();
   </script>
 </body>
 </html>
+
 
