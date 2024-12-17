@@ -3,47 +3,81 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Mapping con Máscara Deformable</title>
+  <title>Video Mapping Avanzado</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
     body {
-      background: #000;
+      margin: 0;
+      background: black;
       color: white;
       font-family: Arial, sans-serif;
-      text-align: center;
       overflow: hidden;
     }
+
     canvas {
-      display: block;
       position: absolute;
       top: 0;
       left: 0;
+      display: block;
     }
-    #controls {
+
+    #menuIcon {
       position: absolute;
       top: 10px;
       left: 10px;
+      font-size: 2em;
+      color: white;
+      cursor: pointer;
       z-index: 2;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 10px;
-      border-radius: 5px;
     }
+
+    #menu {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 250px;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+      z-index: 3;
+    }
+
+    #menu.visible {
+      transform: translateX(0);
+    }
+
+    #menu h2 {
+      color: white;
+    }
+
     input, button {
-      margin: 5px;
-      padding: 8px;
-      font-size: 1em;
+      margin: 10px 0;
+      width: 100%;
+      padding: 5px;
+    }
+
+    button {
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <div id="controls">
+  <!-- Icono para mostrar el menú -->
+  <div id="menuIcon">⚙️</div>
+
+  <!-- Menú oculto -->
+  <div id="menu">
+    <h2>Opciones</h2>
     <input type="file" id="videoInput" accept="video/*">
+    <input type="text" id="youtubeInput" placeholder="Pega URL de YouTube">
+    <button id="loadVideoButton">Cargar Video</button>
+    <button id="addNodeButton">Agregar Nodo</button>
     <button id="resetButton">Resetear Máscara</button>
   </div>
+
+  <!-- Canvas -->
   <canvas id="videoCanvas"></canvas>
   <canvas id="maskCanvas"></canvas>
 
@@ -54,18 +88,22 @@
     const maskCtx = maskCanvas.getContext('2d');
 
     const videoInput = document.getElementById('videoInput');
+    const youtubeInput = document.getElementById('youtubeInput');
+    const loadVideoButton = document.getElementById('loadVideoButton');
+    const addNodeButton = document.getElementById('addNodeButton');
     const resetButton = document.getElementById('resetButton');
+    const menuIcon = document.getElementById('menuIcon');
+    const menu = document.getElementById('menu');
 
     let video = null;
     let maskPoints = [
       { x: 100, y: 100 },
       { x: 500, y: 100 },
       { x: 500, y: 500 },
-      { x: 100, y: 500 },
+      { x: 100, y: 500 }
     ];
     let selectedPoint = null;
 
-    // Ajustar tamaños de los canvas
     function resizeCanvas() {
       videoCanvas.width = window.innerWidth;
       videoCanvas.height = window.innerHeight;
@@ -75,7 +113,6 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Dibujar máscara deformable
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
       maskCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -91,16 +128,15 @@
       maskCtx.fill();
       maskCtx.stroke();
 
-      // Dibujar nodos
+      // Dibujar puntos
       maskCtx.fillStyle = 'red';
-      maskPoints.forEach(point => {
+      maskPoints.forEach(p => {
         maskCtx.beginPath();
-        maskCtx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+        maskCtx.arc(p.x, p.y, 8, 0, Math.PI * 2);
         maskCtx.fill();
       });
     }
 
-    // Interactividad con la máscara
     maskCanvas.addEventListener('mousedown', (e) => {
       const { offsetX, offsetY } = e;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
@@ -114,12 +150,9 @@
     });
     maskCanvas.addEventListener('mouseup', () => selectedPoint = null);
 
-    // Dibujar video ajustado a la máscara
     function drawVideo() {
       if (video && !video.paused && !video.ended) {
         videoCtx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
-
-        // Crear una máscara de recorte
         videoCtx.save();
         videoCtx.beginPath();
         videoCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
@@ -128,46 +161,54 @@
         }
         videoCtx.closePath();
         videoCtx.clip();
-
-        // Dibujar el video
         videoCtx.drawImage(video, 0, 0, videoCanvas.width, videoCanvas.height);
-
         videoCtx.restore();
       }
       requestAnimationFrame(drawVideo);
     }
 
-    // Cargar video desde el input
     videoInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        if (video) video.pause();
         video = document.createElement('video');
         video.src = URL.createObjectURL(file);
-        video.autoplay = true;
         video.loop = true;
-
-        video.addEventListener('loadeddata', () => {
-          drawMask();
-          drawVideo();
-        });
+        video.autoplay = true;
+        video.play();
+        drawVideo();
       }
     });
 
-    // Resetear la máscara
+    loadVideoButton.addEventListener('click', () => {
+      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
+      if (videoId) {
+        video = document.createElement('iframe');
+        video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1`;
+        video.width = videoCanvas.width;
+        video.height = videoCanvas.height;
+        document.body.appendChild(video);
+      }
+    });
+
+    addNodeButton.addEventListener('click', () => {
+      maskPoints.push({ x: 300, y: 300 });
+      drawMask();
+    });
+
     resetButton.addEventListener('click', () => {
       maskPoints = [
         { x: 100, y: 100 },
         { x: 500, y: 100 },
         { x: 500, y: 500 },
-        { x: 100, y: 500 },
+        { x: 100, y: 500 }
       ];
       drawMask();
     });
 
-    // Inicialización
+    menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
     drawMask();
   </script>
 </body>
 </html>
+
 
