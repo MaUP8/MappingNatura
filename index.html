@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Mapping Móvil</title>
+  <title>Video Mapping Optimizado</title>
   <style>
     body {
       margin: 0;
@@ -11,17 +11,14 @@
       overflow: hidden;
       font-family: Arial, sans-serif;
     }
-
     canvas {
-      display: block;
       position: absolute;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      touch-action: none;
+      display: block;
     }
-
     #menuIcon {
       position: absolute;
       bottom: 10px;
@@ -34,7 +31,6 @@
       cursor: pointer;
       z-index: 3;
     }
-
     #menu {
       position: absolute;
       bottom: 0;
@@ -50,12 +46,10 @@
       flex-wrap: wrap;
       justify-content: space-around;
     }
-
     #menu.visible {
       transform: translateY(0);
     }
-
-    button, input {
+    input, button {
       margin: 5px;
       padding: 10px;
       font-size: 1em;
@@ -63,38 +57,37 @@
       text-align: center;
       border: none;
       border-radius: 5px;
-    }
-
-    input {
-      background: #222;
+      background: #333;
       color: white;
     }
   </style>
 </head>
 <body>
+  <!-- Botón del menú -->
   <div id="menuIcon">☰</div>
 
+  <!-- Menú -->
   <div id="menu">
     <input type="file" id="videoInput" accept="video/*">
-    <input type="text" id="youtubeInput" placeholder="YouTube URL">
+    <input type="text" id="youtubeInput" placeholder="Pega la URL de YouTube">
     <button id="loadYouTubeButton">Cargar YouTube</button>
-    <button id="addNodeButton">Agregar Nodo</button>
+    <button id="playPauseButton">Play</button>
     <button id="resetButton">Resetear Máscara</button>
   </div>
 
-  <iframe id="youtubeFrame" style="display:none;"></iframe>
+  <!-- Canvas -->
   <canvas id="maskCanvas"></canvas>
 
   <script>
     const maskCanvas = document.getElementById('maskCanvas');
     const maskCtx = maskCanvas.getContext('2d');
-    const menu = document.getElementById('menu');
-    const menuIcon = document.getElementById('menuIcon');
-    const addNodeButton = document.getElementById('addNodeButton');
-    const resetButton = document.getElementById('resetButton');
+    const videoInput = document.getElementById('videoInput');
     const youtubeInput = document.getElementById('youtubeInput');
     const loadYouTubeButton = document.getElementById('loadYouTubeButton');
-    const youtubeFrame = document.getElementById('youtubeFrame');
+    const playPauseButton = document.getElementById('playPauseButton');
+    const resetButton = document.getElementById('resetButton');
+    const menuIcon = document.getElementById('menuIcon');
+    const menu = document.getElementById('menu');
 
     let maskPoints = [
       { x: 100, y: 100 },
@@ -102,7 +95,10 @@
       { x: window.innerWidth - 100, y: window.innerHeight - 100 },
       { x: 100, y: window.innerHeight - 100 }
     ];
-    let selectedPoint = null;
+    let video = null;
+    let videoSource = 'local'; // local o youtube
+    let youtubeFrame = null;
+    let isPlaying = false;
 
     function resizeCanvas() {
       maskCanvas.width = window.innerWidth;
@@ -114,9 +110,22 @@
 
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+      if (video) {
+        maskCtx.save();
+        maskCtx.beginPath();
+        maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
+        for (let i = 1; i < maskPoints.length; i++) {
+          maskCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
+        }
+        maskCtx.closePath();
+        maskCtx.clip();
+        maskCtx.drawImage(video, 0, 0, maskCanvas.width, maskCanvas.height);
+        maskCtx.restore();
+      }
+
       maskCtx.strokeStyle = 'white';
       maskCtx.lineWidth = 2;
-
       maskCtx.beginPath();
       maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
       for (let i = 1; i < maskPoints.length; i++) {
@@ -126,42 +135,63 @@
       maskCtx.stroke();
 
       maskPoints.forEach(p => {
-        maskCtx.fillStyle = p === selectedPoint ? 'red' : 'white';
-        const size = p === selectedPoint ? 12 : 6;
+        maskCtx.fillStyle = 'red';
         maskCtx.beginPath();
-        maskCtx.arc(p.x, p.y, size, 0, Math.PI * 2);
+        maskCtx.arc(p.x, p.y, 6, 0, Math.PI * 2);
         maskCtx.fill();
       });
+
+      requestAnimationFrame(drawMask);
     }
 
-    maskCanvas.addEventListener('touchstart', (e) => {
-      const touch = e.touches[0];
-      const offsetX = touch.clientX;
-      const offsetY = touch.clientY;
-
-      const clickedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 15);
-      if (clickedPoint === selectedPoint) {
-        selectedPoint = null;
+    function togglePlayPause() {
+      if (!video) return;
+      if (isPlaying) {
+        video.pause();
+        playPauseButton.textContent = 'Play';
       } else {
-        selectedPoint = clickedPoint;
+        video.play();
+        playPauseButton.textContent = 'Pause';
       }
-      drawMask();
-    });
+      isPlaying = !isPlaying;
+    }
 
-    maskCanvas.addEventListener('touchmove', (e) => {
-      if (selectedPoint) {
-        const touch = e.touches[0];
-        selectedPoint.x = touch.clientX;
-        selectedPoint.y = touch.clientY;
-        drawMask();
+    // Cargar video local
+    videoInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (youtubeFrame) youtubeFrame.remove();
+        video = document.createElement('video');
+        video.src = URL.createObjectURL(file);
+        video.loop = true;
+        video.muted = true;
+        video.play();
+        isPlaying = true;
+        playPauseButton.textContent = 'Pause';
       }
     });
 
-    addNodeButton.addEventListener('click', () => {
-      maskPoints.push({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-      drawMask();
+    // Cargar video de YouTube
+    loadYouTubeButton.addEventListener('click', () => {
+      const url = youtubeInput.value;
+      const videoId = url.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
+      if (videoId) {
+        if (video) video.pause();
+        video = document.createElement('iframe');
+        video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}`;
+        video.style.display = 'none';
+        document.body.appendChild(video);
+        isPlaying = true;
+        playPauseButton.textContent = 'Pause';
+      } else {
+        alert('Por favor, ingresa una URL válida de YouTube.');
+      }
     });
 
+    // Mostrar/Ocultar menú
+    menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
+
+    playPauseButton.addEventListener('click', togglePlayPause);
     resetButton.addEventListener('click', () => {
       maskPoints = [
         { x: 100, y: 100 },
@@ -169,26 +199,11 @@
         { x: window.innerWidth - 100, y: window.innerHeight - 100 },
         { x: 100, y: window.innerHeight - 100 }
       ];
-      selectedPoint = null;
-      drawMask();
-    });
-
-    loadYouTubeButton.addEventListener('click', () => {
-      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
-      if (videoId) {
-        youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&mute=1`;
-        youtubeFrame.style.display = 'block';
-      } else {
-        alert('Por favor, ingresa una URL válida de YouTube.');
-      }
-    });
-
-    menuIcon.addEventListener('click', () => {
-      menu.classList.toggle('visible');
     });
 
     drawMask();
   </script>
 </body>
 </html>
+
 
