@@ -3,33 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Mapping Avanzado</title>
+  <title>Video Mapping Móvil</title>
   <style>
     body {
       margin: 0;
       background: black;
-      color: white;
-      font-family: Arial, sans-serif;
       overflow: hidden;
+      font-family: Arial, sans-serif;
     }
 
     canvas {
+      display: block;
       position: absolute;
       top: 0;
       left: 0;
-      display: block;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
     }
 
     #menuIcon {
       position: absolute;
       bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 1.5em;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
       color: white;
+      font-size: 1.5em;
+      padding: 10px;
+      border-radius: 50%;
       cursor: pointer;
       z-index: 3;
-      user-select: none;
     }
 
     #menu {
@@ -37,71 +40,78 @@
       bottom: 0;
       left: 0;
       width: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
       padding: 10px;
       transform: translateY(100%);
-      transition: transform 0.3s ease-in-out;
+      transition: transform 0.3s;
       z-index: 2;
-      text-align: center;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
     }
 
     #menu.visible {
       transform: translateY(0);
     }
 
-    button {
+    button, input {
       margin: 5px;
-      padding: 8px 10px;
+      padding: 10px;
       font-size: 1em;
-      cursor: pointer;
+      width: 45%;
+      text-align: center;
+      border: none;
+      border-radius: 5px;
+    }
+
+    input {
+      background: #222;
+      color: white;
     }
   </style>
 </head>
 <body>
-  <!-- Icono para mostrar/ocultar el menú -->
-  <div id="menuIcon">▲</div>
+  <div id="menuIcon">☰</div>
 
-  <!-- Menú en la parte inferior -->
   <div id="menu">
+    <input type="file" id="videoInput" accept="video/*">
+    <input type="text" id="youtubeInput" placeholder="YouTube URL">
+    <button id="loadYouTubeButton">Cargar YouTube</button>
     <button id="addNodeButton">Agregar Nodo</button>
-    <button id="deleteNodeButton">Eliminar Nodo</button>
     <button id="resetButton">Resetear Máscara</button>
   </div>
 
-  <!-- Canvas -->
-  <canvas id="videoCanvas"></canvas>
+  <iframe id="youtubeFrame" style="display:none;"></iframe>
   <canvas id="maskCanvas"></canvas>
 
   <script>
-    const videoCanvas = document.getElementById('videoCanvas');
     const maskCanvas = document.getElementById('maskCanvas');
-    const videoCtx = videoCanvas.getContext('2d');
     const maskCtx = maskCanvas.getContext('2d');
-
     const menu = document.getElementById('menu');
     const menuIcon = document.getElementById('menuIcon');
     const addNodeButton = document.getElementById('addNodeButton');
     const resetButton = document.getElementById('resetButton');
+    const youtubeInput = document.getElementById('youtubeInput');
+    const loadYouTubeButton = document.getElementById('loadYouTubeButton');
+    const youtubeFrame = document.getElementById('youtubeFrame');
 
     let maskPoints = [
       { x: 100, y: 100 },
-      { x: 500, y: 100 },
-      { x: 500, y: 500 },
-      { x: 100, y: 500 }
+      { x: window.innerWidth - 100, y: 100 },
+      { x: window.innerWidth - 100, y: window.innerHeight - 100 },
+      { x: 100, y: window.innerHeight - 100 }
     ];
     let selectedPoint = null;
 
-    // Ajustar canvas
     function resizeCanvas() {
-      videoCanvas.width = window.innerWidth;
-      videoCanvas.height = window.innerHeight;
       maskCanvas.width = window.innerWidth;
       maskCanvas.height = window.innerHeight;
+      drawMask();
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Dibujar máscara y puntos
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
       maskCtx.strokeStyle = 'white';
@@ -115,74 +125,70 @@
       maskCtx.closePath();
       maskCtx.stroke();
 
-      // Dibujar nodos
       maskPoints.forEach(p => {
         maskCtx.fillStyle = p === selectedPoint ? 'red' : 'white';
-        const size = p === selectedPoint ? 8 : 4;
-
+        const size = p === selectedPoint ? 12 : 6;
         maskCtx.beginPath();
         maskCtx.arc(p.x, p.y, size, 0, Math.PI * 2);
         maskCtx.fill();
       });
     }
 
-    // Agregar nodo
-    addNodeButton.addEventListener('click', () => {
-      maskPoints.push({ x: 300, y: 300 });
-      drawMask();
-    });
+    maskCanvas.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      const offsetX = touch.clientX;
+      const offsetY = touch.clientY;
 
-    // Eliminar nodo seleccionado
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Delete' && selectedPoint) {
-        maskPoints = maskPoints.filter(p => p !== selectedPoint);
+      const clickedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 15);
+      if (clickedPoint === selectedPoint) {
         selectedPoint = null;
-        drawMask();
+      } else {
+        selectedPoint = clickedPoint;
       }
-    });
-
-    // Selección de nodos
-    maskCanvas.addEventListener('mousedown', (e) => {
-      const { offsetX, offsetY } = e;
-      selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
       drawMask();
     });
 
-    maskCanvas.addEventListener('mousemove', (e) => {
+    maskCanvas.addEventListener('touchmove', (e) => {
       if (selectedPoint) {
-        selectedPoint.x = e.offsetX;
-        selectedPoint.y = e.offsetY;
+        const touch = e.touches[0];
+        selectedPoint.x = touch.clientX;
+        selectedPoint.y = touch.clientY;
         drawMask();
       }
     });
 
-    maskCanvas.addEventListener('mouseup', () => {
-      selectedPoint = null;
+    addNodeButton.addEventListener('click', () => {
+      maskPoints.push({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
       drawMask();
     });
 
-    // Resetear máscara
     resetButton.addEventListener('click', () => {
       maskPoints = [
         { x: 100, y: 100 },
-        { x: 500, y: 100 },
-        { x: 500, y: 500 },
-        { x: 100, y: 500 }
+        { x: window.innerWidth - 100, y: 100 },
+        { x: window.innerWidth - 100, y: window.innerHeight - 100 },
+        { x: 100, y: window.innerHeight - 100 }
       ];
       selectedPoint = null;
       drawMask();
     });
 
-    // Mostrar/Ocultar menú
+    loadYouTubeButton.addEventListener('click', () => {
+      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
+      if (videoId) {
+        youtubeFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&playlist=${videoId}&controls=0&mute=1`;
+        youtubeFrame.style.display = 'block';
+      } else {
+        alert('Por favor, ingresa una URL válida de YouTube.');
+      }
+    });
+
     menuIcon.addEventListener('click', () => {
       menu.classList.toggle('visible');
-      menuIcon.textContent = menu.classList.contains('visible') ? '▼' : '▲';
     });
 
     drawMask();
   </script>
 </body>
 </html>
-
-
 
