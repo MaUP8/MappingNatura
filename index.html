@@ -10,7 +10,6 @@
       background: black;
       overflow: hidden;
       font-family: Arial, sans-serif;
-      touch-action: none; /* Evita comportamientos táctiles predeterminados */
     }
     canvas {
       position: absolute;
@@ -62,13 +61,10 @@
       color: white;
       cursor: pointer;
     }
-    #hiddenVideo {
-      display: none;
-    }
   </style>
 </head>
 <body>
-  <!-- Botón del menú -->
+  <!-- Icono del menú -->
   <div id="menuIcon">☰</div>
 
   <!-- Menú -->
@@ -85,9 +81,6 @@
   <!-- Canvas -->
   <canvas id="maskCanvas"></canvas>
 
-  <!-- Video Oculto -->
-  <video id="hiddenVideo" crossorigin="anonymous"></video>
-
   <script>
     const maskCanvas = document.getElementById('maskCanvas');
     const maskCtx = maskCanvas.getContext('2d');
@@ -100,7 +93,6 @@
     const deleteNodeButton = document.getElementById('deleteNodeButton');
     const resetButton = document.getElementById('resetButton');
     const playPauseButton = document.getElementById('playPauseButton');
-    const hiddenVideo = document.getElementById('hiddenVideo');
 
     let maskPoints = [
       { x: 100, y: 100 },
@@ -110,6 +102,7 @@
     ];
     let selectedPoint = null;
     let isDragging = false;
+    let video = null;
     let isPlaying = false;
 
     // Ajustar tamaño del Canvas
@@ -124,7 +117,7 @@
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
 
-      if (hiddenVideo && !hiddenVideo.paused) {
+      if (video && video.readyState >= 2) {
         maskCtx.save();
         maskCtx.beginPath();
         maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
@@ -133,7 +126,7 @@
         }
         maskCtx.closePath();
         maskCtx.clip();
-        maskCtx.drawImage(hiddenVideo, 0, 0, maskCanvas.width, maskCanvas.height);
+        maskCtx.drawImage(video, 0, 0, maskCanvas.width, maskCanvas.height);
         maskCtx.restore();
       }
 
@@ -176,14 +169,28 @@
       isDragging = false;
     });
 
-    // Video Local
+    // Cargar Video Local
     videoInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        hiddenVideo.src = URL.createObjectURL(file);
-        hiddenVideo.loop = true;
-        hiddenVideo.muted = true;
-        hiddenVideo.play();
+        video = document.createElement('video');
+        video.src = URL.createObjectURL(file);
+        video.loop = true;
+        video.muted = true;
+        video.play();
+        isPlaying = true;
+      }
+    });
+
+    // Cargar Video de YouTube
+    loadYouTubeButton.addEventListener('click', () => {
+      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
+      if (videoId) {
+        video = document.createElement('video');
+        video.src = `https://www.youtube.com/embed/${videoId}`;
+        video.loop = true;
+        video.muted = true;
+        video.play();
         isPlaying = true;
       }
     });
@@ -201,12 +208,12 @@
     });
 
     playPauseButton.addEventListener('click', () => {
-      if (hiddenVideo) {
+      if (video) {
         if (isPlaying) {
-          hiddenVideo.pause();
+          video.pause();
           playPauseButton.textContent = 'Play';
         } else {
-          hiddenVideo.play();
+          video.play();
           playPauseButton.textContent = 'Pause';
         }
         isPlaying = !isPlaying;
@@ -230,3 +237,4 @@
   </script>
 </body>
 </html>
+
