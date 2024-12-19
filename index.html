@@ -62,10 +62,13 @@
       color: white;
       cursor: pointer;
     }
+    #hiddenVideo {
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <!-- Icono del menú -->
+  <!-- Botón del menú -->
   <div id="menuIcon">☰</div>
 
   <!-- Menú -->
@@ -82,6 +85,9 @@
   <!-- Canvas -->
   <canvas id="maskCanvas"></canvas>
 
+  <!-- Video Oculto -->
+  <video id="hiddenVideo" crossorigin="anonymous"></video>
+
   <script>
     const maskCanvas = document.getElementById('maskCanvas');
     const maskCtx = maskCanvas.getContext('2d');
@@ -94,6 +100,7 @@
     const deleteNodeButton = document.getElementById('deleteNodeButton');
     const resetButton = document.getElementById('resetButton');
     const playPauseButton = document.getElementById('playPauseButton');
+    const hiddenVideo = document.getElementById('hiddenVideo');
 
     let maskPoints = [
       { x: 100, y: 100 },
@@ -103,10 +110,9 @@
     ];
     let selectedPoint = null;
     let isDragging = false;
-    let video = null;
     let isPlaying = false;
 
-    // Redimensionar Canvas
+    // Ajustar tamaño del Canvas
     function resizeCanvas() {
       maskCanvas.width = window.innerWidth;
       maskCanvas.height = window.innerHeight;
@@ -118,7 +124,7 @@
     function drawMask() {
       maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
 
-      if (video) {
+      if (hiddenVideo && !hiddenVideo.paused) {
         maskCtx.save();
         maskCtx.beginPath();
         maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
@@ -127,7 +133,7 @@
         }
         maskCtx.closePath();
         maskCtx.clip();
-        maskCtx.drawImage(video, 0, 0, maskCanvas.width, maskCanvas.height);
+        maskCtx.drawImage(hiddenVideo, 0, 0, maskCanvas.width, maskCanvas.height);
         maskCtx.restore();
       }
 
@@ -152,7 +158,7 @@
       requestAnimationFrame(drawMask);
     }
 
-    // Eventos de Nodos
+    // Eventos para Nodos
     maskCanvas.addEventListener('mousedown', (e) => {
       const { offsetX, offsetY } = e;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
@@ -170,47 +176,15 @@
       isDragging = false;
     });
 
-    maskCanvas.addEventListener('touchstart', (e) => {
-      const touch = e.touches[0];
-      const offsetX = touch.clientX, offsetY = touch.clientY;
-      selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
-      isDragging = !!selectedPoint;
-    });
-
-    maskCanvas.addEventListener('touchmove', (e) => {
-      if (isDragging && selectedPoint) {
-        const touch = e.touches[0];
-        selectedPoint.x = touch.clientX;
-        selectedPoint.y = touch.clientY;
-      }
-    });
-
-    maskCanvas.addEventListener('touchend', () => {
-      isDragging = false;
-    });
-
-    // Cargar Video Local
+    // Video Local
     videoInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        video = document.createElement('video');
-        video.src = URL.createObjectURL(file);
-        video.loop = true;
-        video.muted = true;
-        video.play();
+        hiddenVideo.src = URL.createObjectURL(file);
+        hiddenVideo.loop = true;
+        hiddenVideo.muted = true;
+        hiddenVideo.play();
         isPlaying = true;
-      }
-    });
-
-    // Cargar Video de YouTube
-    loadYouTubeButton.addEventListener('click', () => {
-      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
-      if (videoId) {
-        video = document.createElement('video');
-        video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1`;
-        video.crossOrigin = "anonymous";
-        video.loop = true;
-        video.play();
       }
     });
 
@@ -227,12 +201,12 @@
     });
 
     playPauseButton.addEventListener('click', () => {
-      if (video) {
+      if (hiddenVideo) {
         if (isPlaying) {
-          video.pause();
+          hiddenVideo.pause();
           playPauseButton.textContent = 'Play';
         } else {
-          video.play();
+          hiddenVideo.play();
           playPauseButton.textContent = 'Pause';
         }
         isPlaying = !isPlaying;
