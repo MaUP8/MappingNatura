@@ -65,7 +65,7 @@
   </style>
 </head>
 <body>
-  <!-- Botón del menú -->
+  <!-- Icono del menú -->
   <div id="menuIcon">☰</div>
 
   <!-- Menú -->
@@ -106,7 +106,7 @@
     let video = null;
     let isPlaying = false;
 
-    // Ajustar tamaño del Canvas
+    // Redimensionar Canvas
     function resizeCanvas() {
       maskCanvas.width = window.innerWidth;
       maskCanvas.height = window.innerHeight;
@@ -152,7 +152,7 @@
       requestAnimationFrame(drawMask);
     }
 
-    // Eventos para Nodos
+    // Eventos de Nodos
     maskCanvas.addEventListener('mousedown', (e) => {
       const { offsetX, offsetY } = e;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
@@ -170,7 +170,26 @@
       isDragging = false;
     });
 
-    // Video Local
+    maskCanvas.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      const offsetX = touch.clientX, offsetY = touch.clientY;
+      selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
+      isDragging = !!selectedPoint;
+    });
+
+    maskCanvas.addEventListener('touchmove', (e) => {
+      if (isDragging && selectedPoint) {
+        const touch = e.touches[0];
+        selectedPoint.x = touch.clientX;
+        selectedPoint.y = touch.clientY;
+      }
+    });
+
+    maskCanvas.addEventListener('touchend', () => {
+      isDragging = false;
+    });
+
+    // Cargar Video Local
     videoInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -180,11 +199,10 @@
         video.muted = true;
         video.play();
         isPlaying = true;
-        playPauseButton.textContent = 'Pause';
       }
     });
 
-    // Video YouTube
+    // Cargar Video de YouTube
     loadYouTubeButton.addEventListener('click', () => {
       const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
       if (videoId) {
@@ -192,14 +210,22 @@
         video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1`;
         video.crossOrigin = "anonymous";
         video.loop = true;
-        video.muted = true;
         video.play();
-        isPlaying = true;
-        playPauseButton.textContent = 'Pause';
       }
     });
 
-    // Play/Pause
+    // Botones de Interacción
+    addNodeButton.addEventListener('click', () => {
+      maskPoints.push({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+    });
+
+    deleteNodeButton.addEventListener('click', () => {
+      if (selectedPoint) {
+        maskPoints = maskPoints.filter(p => p !== selectedPoint);
+        selectedPoint = null;
+      }
+    });
+
     playPauseButton.addEventListener('click', () => {
       if (video) {
         if (isPlaying) {
@@ -213,7 +239,6 @@
       }
     });
 
-    // Resetear Máscara
     resetButton.addEventListener('click', () => {
       maskPoints = [
         { x: 100, y: 100 },
