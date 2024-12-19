@@ -101,6 +101,7 @@
     let isDragging = false;
     let video = null;
     let isPlaying = false;
+    let externalWindow = null;
 
     // Redimensionar Canvas
     function resizeCanvas() {
@@ -147,6 +148,68 @@
 
       requestAnimationFrame(drawMask);
     }
+
+    function openExternalDisplay() {
+      if (externalWindow && !externalWindow.closed) {
+        externalWindow.focus();
+      } else {
+        externalWindow = window.open("", "External Display", "width=800,height=600");
+        if (externalWindow) {
+          externalWindow.document.body.style.margin = "0";
+          externalWindow.document.body.style.background = "black";
+
+          const externalCanvas = externalWindow.document.createElement("canvas");
+          externalCanvas.style.width = "100vw";
+          externalCanvas.style.height = "100vh";
+          externalCanvas.width = window.innerWidth;
+          externalCanvas.height = window.innerHeight;
+          externalWindow.document.body.appendChild(externalCanvas);
+
+          const externalCtx = externalCanvas.getContext("2d");
+
+          function drawToExternalCanvas() {
+            externalCtx.clearRect(0, 0, externalCanvas.width, externalCanvas.height);
+
+            if (video) {
+              externalCtx.save();
+              externalCtx.beginPath();
+              externalCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
+              for (let i = 1; i < maskPoints.length; i++) {
+                externalCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
+              }
+              externalCtx.closePath();
+              externalCtx.clip();
+              externalCtx.drawImage(video, 0, 0, externalCanvas.width, externalCanvas.height);
+              externalCtx.restore();
+            }
+
+            externalCtx.strokeStyle = "white";
+            externalCtx.lineWidth = 2;
+            externalCtx.beginPath();
+            externalCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
+            for (let i = 1; i < maskPoints.length; i++) {
+              externalCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
+            }
+            externalCtx.closePath();
+            externalCtx.stroke();
+
+            requestAnimationFrame(drawToExternalCanvas);
+          }
+
+          drawToExternalCanvas();
+        }
+      }
+    }
+
+    // Detecta si una pantalla externa está conectada
+    window.addEventListener("resize", () => {
+      if (window.screen.availWidth > window.innerWidth) {
+        openExternalDisplay();
+      } else if (externalWindow) {
+        externalWindow.close();
+        externalWindow = null;
+      }
+    });
 
     // Eventos de Nodos
     maskCanvas.addEventListener('mousedown', (e) => {
@@ -234,10 +297,12 @@
     });
 
     // Menú Ocultable
-    menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
+    menuIcon.addEventListener('click', () => {
+      menu.classList.toggle('visible');
+      openExternalDisplay();
+    });
 
     drawMask();
   </script>
 </body>
 </html>
-
