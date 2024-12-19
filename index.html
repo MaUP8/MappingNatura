@@ -160,15 +160,18 @@
     }
 
     uiCanvas.addEventListener('mousedown', (e) => {
-      const { offsetX, offsetY } = e;
+      const rect = uiCanvas.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
       isDragging = !!selectedPoint;
     });
 
     uiCanvas.addEventListener('mousemove', (e) => {
       if (isDragging && selectedPoint) {
-        selectedPoint.x = e.offsetX;
-        selectedPoint.y = e.offsetY;
+        const rect = uiCanvas.getBoundingClientRect();
+        selectedPoint.x = e.clientX - rect.left;
+        selectedPoint.y = e.clientY - rect.top;
       }
     });
 
@@ -233,5 +236,3 @@
   </script>
 </body>
 </html>
-
-
