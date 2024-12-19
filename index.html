@@ -71,25 +71,26 @@
   <!-- Menú -->
   <div id="menu">
     <input type="file" id="videoInput" accept="video/*">
-    <input type="text" id="youtubeInput" placeholder="Pega la URL de YouTube">
-    <button id="loadYouTubeButton">Cargar YouTube</button>
     <button id="addNodeButton">Agregar Nodo</button>
     <button id="deleteNodeButton">Eliminar Nodo</button>
     <button id="playPauseButton">Play</button>
     <button id="resetButton">Resetear Máscara</button>
   </div>
 
-  <!-- Canvas -->
-  <canvas id="maskCanvas"></canvas>
+  <!-- Canvas principal (interfaz) -->
+  <canvas id="uiCanvas"></canvas>
+
+  <!-- Canvas para salida HDMI (solo máscara) -->
+  <canvas id="maskCanvas" style="display: none;"></canvas>
 
   <script>
+    const uiCanvas = document.getElementById('uiCanvas');
     const maskCanvas = document.getElementById('maskCanvas');
+    const uiCtx = uiCanvas.getContext('2d');
     const maskCtx = maskCanvas.getContext('2d');
     const menuIcon = document.getElementById('menuIcon');
     const menu = document.getElementById('menu');
     const videoInput = document.getElementById('videoInput');
-    const youtubeInput = document.getElementById('youtubeInput');
-    const loadYouTubeButton = document.getElementById('loadYouTubeButton');
     const addNodeButton = document.getElementById('addNodeButton');
     const deleteNodeButton = document.getElementById('deleteNodeButton');
     const resetButton = document.getElementById('resetButton');
@@ -106,90 +107,82 @@
     let video = null;
     let isPlaying = false;
 
-    // Redimensionar Canvas
     function resizeCanvas() {
+      uiCanvas.width = window.innerWidth;
+      uiCanvas.height = window.innerHeight;
       maskCanvas.width = window.innerWidth;
       maskCanvas.height = window.innerHeight;
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Dibujar máscara y video
-    function drawMask() {
-      maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    function drawMask(ctx) {
+      ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
 
       if (video) {
-        maskCtx.save();
-        maskCtx.beginPath();
-        maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(maskPoints[0].x, maskPoints[0].y);
         for (let i = 1; i < maskPoints.length; i++) {
-          maskCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
+          ctx.lineTo(maskPoints[i].x, maskPoints[i].y);
         }
-        maskCtx.closePath();
-        maskCtx.clip();
-        maskCtx.drawImage(video, 0, 0, maskCanvas.width, maskCanvas.height);
-        maskCtx.restore();
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(video, 0, 0, maskCanvas.width, maskCanvas.height);
+        ctx.restore();
       }
 
-      maskCtx.strokeStyle = 'white';
-      maskCtx.lineWidth = 2;
-      maskCtx.beginPath();
-      maskCtx.moveTo(maskPoints[0].x, maskPoints[0].y);
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(maskPoints[0].x, maskPoints[0].y);
       for (let i = 1; i < maskPoints.length; i++) {
-        maskCtx.lineTo(maskPoints[i].x, maskPoints[i].y);
+        ctx.lineTo(maskPoints[i].x, maskPoints[i].y);
       }
-      maskCtx.closePath();
-      maskCtx.stroke();
+      ctx.closePath();
+      ctx.stroke();
 
-      maskPoints.forEach(p => {
-        maskCtx.fillStyle = p === selectedPoint ? 'red' : 'white';
-        const size = p === selectedPoint ? 10 : 6;
-        maskCtx.beginPath();
-        maskCtx.arc(p.x, p.y, size, 0, Math.PI * 2);
-        maskCtx.fill();
-      });
-
-      requestAnimationFrame(drawMask);
+      if (ctx === uiCtx) {
+        maskPoints.forEach(p => {
+          ctx.fillStyle = p === selectedPoint ? 'red' : 'white';
+          const size = p === selectedPoint ? 10 : 6;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
     }
 
-    // Eventos de Nodos
-    maskCanvas.addEventListener('mousedown', (e) => {
-      const { offsetX, offsetY } = e;
+    function draw() {
+      drawMask(uiCtx);
+      drawMask(maskCtx);
+      requestAnimationFrame(draw);
+    }
+
+    uiCanvas.addEventListener('mousedown', (e) => {
+      const rect = uiCanvas.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
       selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
       isDragging = !!selectedPoint;
     });
 
-    maskCanvas.addEventListener('mousemove', (e) => {
+    uiCanvas.addEventListener('mousemove', (e) => {
       if (isDragging && selectedPoint) {
-        selectedPoint.x = e.offsetX;
-        selectedPoint.y = e.offsetY;
+        const rect = uiCanvas.getBoundingClientRect();
+        selectedPoint.x = e.clientX - rect.left;
+        selectedPoint.y = e.clientY - rect.top;
       }
     });
 
-    maskCanvas.addEventListener('mouseup', () => {
+    uiCanvas.addEventListener('mouseup', () => {
       isDragging = false;
     });
 
-    maskCanvas.addEventListener('touchstart', (e) => {
-      const touch = e.touches[0];
-      const offsetX = touch.clientX, offsetY = touch.clientY;
-      selectedPoint = maskPoints.find(p => Math.hypot(p.x - offsetX, p.y - offsetY) < 10);
-      isDragging = !!selectedPoint;
-    });
-
-    maskCanvas.addEventListener('touchmove', (e) => {
-      if (isDragging && selectedPoint) {
-        const touch = e.touches[0];
-        selectedPoint.x = touch.clientX;
-        selectedPoint.y = touch.clientY;
-      }
-    });
-
-    maskCanvas.addEventListener('touchend', () => {
+    uiCanvas.addEventListener('mouseleave', () => {
       isDragging = false;
     });
 
-    // Cargar Video Local
     videoInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -199,22 +192,10 @@
         video.muted = true;
         video.play();
         isPlaying = true;
+        playPauseButton.textContent = 'Pause';
       }
     });
 
-    // Cargar Video de YouTube
-    loadYouTubeButton.addEventListener('click', () => {
-      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
-      if (videoId) {
-        video = document.createElement('video');
-        video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1`;
-        video.crossOrigin = "anonymous";
-        video.loop = true;
-        video.play();
-      }
-    });
-
-    // Botones de Interacción
     addNodeButton.addEventListener('click', () => {
       maskPoints.push({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
     });
@@ -249,11 +230,9 @@
       selectedPoint = null;
     });
 
-    // Menú Ocultable
     menuIcon.addEventListener('click', () => menu.classList.toggle('visible'));
 
-    drawMask();
+    draw();
   </script>
 </body>
 </html>
-
