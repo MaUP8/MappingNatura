@@ -71,8 +71,6 @@
   <!-- Menú -->
   <div id="menu">
     <input type="file" id="videoInput" accept="video/*">
-    <input type="text" id="youtubeInput" placeholder="Pega la URL de YouTube">
-    <button id="loadYouTubeButton">Cargar YouTube</button>
     <button id="addNodeButton">Agregar Nodo</button>
     <button id="deleteNodeButton">Eliminar Nodo</button>
     <button id="playPauseButton">Play</button>
@@ -88,8 +86,6 @@
     const menuIcon = document.getElementById('menuIcon');
     const menu = document.getElementById('menu');
     const videoInput = document.getElementById('videoInput');
-    const youtubeInput = document.getElementById('youtubeInput');
-    const loadYouTubeButton = document.getElementById('loadYouTubeButton');
     const addNodeButton = document.getElementById('addNodeButton');
     const deleteNodeButton = document.getElementById('deleteNodeButton');
     const resetButton = document.getElementById('resetButton');
@@ -202,18 +198,6 @@
       }
     });
 
-    // Cargar Video de YouTube
-    loadYouTubeButton.addEventListener('click', () => {
-      const videoId = youtubeInput.value.match(/(?:v=|youtu\.be\/)([^&]+)/)?.[1];
-      if (videoId) {
-        video = document.createElement('video');
-        video.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1`;
-        video.crossOrigin = "anonymous";
-        video.loop = true;
-        video.play();
-      }
-    });
-
     // Botones de Interacción
     addNodeButton.addEventListener('click', () => {
       maskPoints.push({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
@@ -256,3 +240,4 @@
   </script>
 </body>
 </html>
+
