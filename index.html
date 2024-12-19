@@ -20,6 +20,13 @@
       height: 100vh;
       touch-action: none;
     }
+    #uiCanvas {
+      z-index: 2;
+    }
+    #maskCanvas {
+      z-index: 1;
+      pointer-events: none; /* Asegura que no interfiera con eventos */
+    }
     #menuIcon {
       position: absolute;
       bottom: 10px;
@@ -42,7 +49,7 @@
       padding: 10px;
       transform: translateY(100%);
       transition: transform 0.3s;
-      z-index: 2;
+      z-index: 3;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-around;
@@ -81,7 +88,7 @@
   <canvas id="uiCanvas"></canvas>
 
   <!-- Canvas para salida HDMI (solo máscara) -->
-  <canvas id="maskCanvas" style="display: none;"></canvas>
+  <canvas id="maskCanvas"></canvas>
 
   <script>
     const uiCanvas = document.getElementById('uiCanvas');
